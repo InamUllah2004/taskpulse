@@ -1,0 +1,341 @@
+<template>
+  <Header :role="'projectDirector'" />
+  <div class="container">
+    <h1 class="title">Sprint Management</h1>
+
+    <ul class="project-list">
+      <li
+        v-for="project in projectStore.projects"
+        :key="project.id"
+        class="project-card"
+      >
+        <div class="project-header">
+          <div>
+            <h3 class="project-name">{{ project.name }}</h3>
+            <p class="project-description">{{ project.description }}</p>
+          </div>
+          <button @click="toggleProject(project.id)" class="btn-primary">
+            {{ openProjectId === project.id ? 'Hide Sprints' : 'Manage Sprints' }}
+          </button>
+        </div>
+
+        <!-- Expanded Sprint Section -->
+        <div v-if="openProjectId === project.id" class="sprint-section">
+          <h4 class="sprint-title">Sprints for: {{ project.name }}</h4>
+
+          <ul v-if="project.sprints?.length" class="sprint-list">
+            <li
+              v-for="sprint in project.sprints"
+              :key="sprint.id"
+              class="sprint-card"
+            >
+              <div>
+                <strong>{{ sprint.name }}</strong> ({{ sprint.startDate }} → {{ sprint.endDate }})
+                <p class="sprint-goal">{{ sprint.goal }}</p>
+              </div>
+              <div class="task-buttons">
+                  <button class="add-btn" @click="openTaskModal(sprint)">Add Task</button>
+                  <button class="view-btn" @click="openViewModal(sprint)">View Tasks</button>
+                  <button class="delete-btn" @click="deleteSprint(project.id, sprint.id)">Delete</button>
+              </div>
+
+              </li>
+          </ul>
+          <p v-else>No sprints found for this project.</p>
+
+          <form @submit.prevent="handleAddSprint(project.id)" class="sprint-form">
+            <input v-model="sprintData.name" placeholder="Sprint Name" required />
+            <input v-model="sprintData.goal" placeholder="Sprint Goal" required />
+            <input v-model="sprintData.startDate" type="date" required />
+            <input v-model="sprintData.endDate" type="date" required />
+            <button type="submit" class="btn-primary">Add Sprint</button>
+          </form>
+        </div>
+      </li>
+    </ul>
+
+    <!-- Task Modal -->
+    <div v-if="selectedSprint" class="modal-overlay">
+      <div class="modal">
+        <h3>Add Task to: {{ selectedSprint.name }}</h3>
+        <form @submit.prevent="addTask">
+          <input v-model="taskData.title" placeholder="Task Title" required />
+          <input v-model="taskData.description" placeholder="Task Description" required />
+           <div class="task-buttons">
+          <button type="submit" class="add-btn">Add Task</button>
+          <button type="button" class="delete-btn" @click="closeTaskModal">Close</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- View Tasks Modal -->
+   <div v-if="viewSprint" class="modal-overlay">
+    <div class="modal">
+     <h3>Tasks for: {{ viewSprint.name }}</h3>
+      <div v-if="viewSprint.tasks?.length">
+      <ul>
+         <li v-for="task in viewSprint.tasks" :key="task.id">
+          <strong>{{ task.title }}</strong> - {{ task.description }} 
+          <em>({{ task.status }})</em>
+        </li>
+       </ul>
+      </div>
+      <p v-else>No tasks added to this sprint.</p>
+    <button class="btn-primary" @click="closeViewModal">Close</button>
+    </div>
+  </div>
+
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { useProjectStore } from './store/projectStore'
+import { Sprint } from './store/sprint'
+import { useTaskStore } from './store/taskStore'
+import { Task } from './store/task'
+import Header from './components/header.vue'
+
+const projectStore = useProjectStore()
+const taskStore = useTaskStore()
+
+const openProjectId = ref(null)
+const selectedSprint = ref(null)
+const viewSprint = ref(null)
+
+function openViewModal(sprint) {
+  viewSprint.value = sprint
+}
+
+function closeViewModal() {
+  viewSprint.value = null
+}
+
+const sprintData = ref({
+  name: '',
+  goal: '',
+  startDate: '',
+  endDate: ''
+})
+
+const taskData = ref({
+  title: '',
+  description: ''
+})
+
+function toggleProject(projectId) {
+  openProjectId.value = openProjectId.value === projectId ? null : projectId
+}
+
+function handleAddSprint(projectId) {
+  const { name, goal, startDate, endDate } = sprintData.value
+  if (!name || !goal || !startDate || !endDate) {
+    alert('Please fill in all fields.')
+    return
+  }
+  if (new Date(endDate) <= new Date(startDate)) {
+    alert('End date must be after the start date!')
+    return
+  }
+  const newSprint = new Sprint(name, goal, startDate, endDate)
+  projectStore.addSprint(projectId, newSprint)
+  sprintData.value = { name: '', goal: '', startDate: '', endDate: '' }
+}
+
+function deleteSprint(projectId, sprintId) {
+  const project = projectStore.projects.find(p => p.id === projectId)
+  if (project) {
+    project.sprints = project.sprints.filter(s => s.id !== sprintId)
+    projectStore.saveToLocalStorage()
+  }
+}
+
+function openTaskModal(sprint) {
+  selectedSprint.value = sprint
+  taskData.value = { title: '', description: '' }
+}
+
+function closeTaskModal() {
+  selectedSprint.value = null
+}
+
+function addTask() {
+  if (!taskData.value.title || !taskData.value.description) {
+    alert('Please fill in both fields.')
+    return
+  }
+  const newTask = taskStore.addTask(taskData.value.title, taskData.value.description)
+  selectedSprint.value.tasks = selectedSprint.value.tasks || []
+  selectedSprint.value.tasks.push(newTask)
+  projectStore.saveToLocalStorage()
+  closeTaskModal()
+}
+</script>
+
+<style scoped>
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  background-color: #f2f2f2;
+  color: #333;
+}
+
+.title {
+  text-align: center;
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+.project-list {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 30px;
+}
+
+.project-card {
+  background-color: #fff;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.project-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-name {
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.project-description {
+  color: #666;
+  font-size: 14px;
+}
+
+.sprint-section {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 2px solid #ccc;
+}
+
+.sprint-title {
+  font-size: 20px;
+  margin-bottom: 15px;
+}
+
+.sprint-list {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 15px;
+}
+
+.sprint-card {
+  background-color: #fefefe;
+  padding: 10px;
+  border: 1px solid #bbb;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sprint-goal {
+  font-size: 13px;
+  color: #555;
+}
+
+.sprint-form {
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sprint-form input {
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid #aaa;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 30%;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-secondary {
+  background-color: #28a745;
+  color: white;
+  margin-top: 10px;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+.task-buttons {
+  display: flex;
+  gap: 10px; /* spacing between buttons */
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.task-buttons button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.task-buttons .add-btn {
+  background-color: green;
+}
+
+.task-buttons .delete-btn {
+  background-color: red;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 400px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+.task-buttons .view-btn {
+  background-color: #17a2b8;
+  color: white;
+}
+
+</style>
