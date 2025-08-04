@@ -17,7 +17,8 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="task in sprintInfo.sprint.tasks.filter(t => t.status !== 'done' && !t.completed)" :key="task._id">
+            <tr v-for="task in sprintInfo.sprint.tasks.filter(t => t.status !== 'done' && !t.completed)"
+              :key="task._id">
               <td>{{ task.title }}</td>
               <td>{{ task.description }}</td>
               <td>
@@ -115,8 +116,6 @@ async function assignToMe(task, sprintInfo) {
   }
 }
 
-
-
 async function markComplete(task, sprintInfo) {
   const projectRes = await fetch(`http://localhost:3000/api/projects/${sprintInfo.project._id}`)
   const project = await projectRes.json()
@@ -139,31 +138,39 @@ async function markComplete(task, sprintInfo) {
   max-width: 900px;
   margin: auto;
   border-radius: 10px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
+
 .sprint-section {
   margin-bottom: 30px;
 }
+
 table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 10px;
   background: #fff;
 }
-th, td {
+
+th,
+td {
   padding: 10px;
   border: 1px solid #ccc;
   text-align: left;
 }
+
 .status-complete {
   color: #4caf50;
   font-weight: bold;
 }
+
 .status-pending {
   color: #d84315;
   font-weight: bold;
 }
-.assign-btn, .complete-btn {
+
+.assign-btn,
+.complete-btn {
   background: #2196f3;
   color: #fff;
   border: none;
@@ -175,9 +182,12 @@ th, td {
   margin-right: 6px;
   transition: background 0.2s;
 }
-.assign-btn:hover, .complete-btn:hover {
+
+.assign-btn:hover,
+.complete-btn:hover {
   background: #1769aa;
 }
+
 .complete-btn:disabled {
   background: #aaa;
   cursor: not-allowed;
