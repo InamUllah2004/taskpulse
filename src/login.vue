@@ -56,29 +56,43 @@ function validatePassword() {
   passwordValid.value = password.value.length >= 6
 }
 
-function handleLogin() {
-  const user = store.users.find(
-    (c) => c.email === email.value && c.password === password.value
-  )
+async function handleLogin() {
+  try {
+    const res = await fetch('http://localhost:3000/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.value, password: password.value }),
+    });
 
-  if (user) {
-    store.currentEmail = user.email
-    store.currentRole = user.role
-    alert(`Welcome ${user.email}!`)
-    alert(`Your role is ${store.currentRole}`)
-    email.value = ''
-    password.value = ''
-    errorMessage.value = ''
-    if(user.role === 'projectDirector') {
-      router.push("/dash")
-    } else if(user.role === 'teamLead') {
-      router.push("/dashBoard1")
-    } else if(user.role === 'developer') {
-      router.push("/dashBoard2")
-  } else {
-    errorMessage.value = 'Invalid email or password.'
+    if (!res.ok) {
+      errorMessage.value = 'Invalid email or password.';
+      return;
+    }
+
+    const user = await res.json();
+
+    // Set in Pinia store
+    store.currentEmail = user.email;
+    store.currentRole = user.role;
+
+    // Local storage
+    localStorage.setItem('currentEmail', user.email);
+    localStorage.setItem('currentRole', user.role);
+
+    alert(`Welcome ${user.email}!`);
+    alert(`Your role is ${user.role}`);
+    email.value = '';
+    password.value = '';
+    errorMessage.value = '';
+
+    // Redirect based on role
+    if (user.role === 'projectDirector') router.push("/dash");
+    else if (user.role === 'teamLead') router.push("/dashBoard1");
+    else if (user.role === 'developer') router.push("/dashBoard2");
+
+  } catch (e) {
+    errorMessage.value = 'Login failed: ' + e.message;
   }
-}
 }
 
 </script>

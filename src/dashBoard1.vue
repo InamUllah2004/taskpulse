@@ -49,118 +49,95 @@
   </div>
 </template>
 
-
-
 <script setup>
-// Format time for chat preview
-function formatTime(ts) {
-  // Try to parse as Date, fallback to string
-  const date = new Date(ts)
-  if (isNaN(date.getTime())) return ts
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
 import Header from './components/header.vue'
 import { onMounted, computed, ref } from 'vue'
-import { useUserStore } from './store/userStore'
-import { useProjectStore } from './store/projectStore'
-import { useTeamStore } from './store/teamStore'
-import { useMessageStore } from './store/messageStore'
 import { useRouter } from 'vue-router'
 import Chart from 'chart.js/auto'
+import { useMessageStore } from './store/messageStore.js'
 
-const userStore = useUserStore()
-const projectStore = useProjectStore()
-const teamStore = useTeamStore()
-const messageStore = useMessageStore()
-const router = useRouter()
-
+const users = ref([])
+const teams = ref([])
+const projects = ref([])
+const currentUser = ref(null)
 const showChart = ref(false)
 const noDataMessage = ref('')
 const chartCanvas = ref(null)
 const chartInstance = ref(null)
-
-// Get current user
-const currentUser = userStore.users.find(u => u.email === userStore.currentEmail)
-
-
-// For new message input if no messages
+const router = useRouter()
+const messageStore = useMessageStore()
 const newMessage = ref('')
-function sendMessage() {
-  if (!newMessage.value.trim()) return
-  messageStore.addMessage({
-    sender: currentUser?.name || 'Unknown',
-    content: newMessage.value,
-    timestamp: new Date().toLocaleString()
-  })
-  newMessage.value = ''
+
+function formatTime(ts) {
+  const date = new Date(ts)
+  return isNaN(date.getTime()) ? ts : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-// Get latest message for chat preview
-const latestMessage = computed(() => {
-  const messages = messageStore.messages
-  return messages.length ? messages[messages.length - 1] : null
-})
+async function fetchAll() {
+  try {
+    const [userRes, teamRes, projectRes] = await Promise.all([
+      fetch('http://localhost:3000/api/users'),
+      fetch('http://localhost:3000/api/teams'),
+      fetch('http://localhost:3000/api/projects')
+    ])
 
-function goToMsg() {
-  showNoMessageCard.value = false
-  router.push('/msg')
+    users.value = userRes.ok ? await userRes.json() : []
+    teams.value = teamRes.ok ? await teamRes.json() : []
+    projects.value = projectRes.ok ? await projectRes.json() : []
+  } catch (e) {
+    console.error('🔥 Error in fetchAll():', e)
+    users.value = []
+    teams.value = []
+    projects.value = []
+  }
 }
 
-onMounted(() => {
-  if (!currentUser) {
-    noDataMessage.value = 'User not found.'
+async function initializeDashboard() {
+  await fetchAll()
+
+  const email = localStorage.getItem('currentEmail')
+  if (!email) {
+    alert('No email found in localStorage. Please login.')
     return
   }
 
-  const leadTeam = teamStore.teams.find(team => team.teamLead.email === currentUser.email)
+  currentUser.value = users.value.find(u => u.email === email) || users.value[0] || null
+
+  if (!currentUser.value) {
+    alert('User not found. Please login again.')
+    return
+  }
+
+  const leadTeam = teams.value.find(team => team?.teamLead?.email === currentUser.value.email)
   if (!leadTeam) {
     noDataMessage.value = 'No team assigned to you.'
     return
   }
 
-  const assignedProjectIds = leadTeam.assignedProjects
-  const assignedProjects = projectStore.projects.filter(p => assignedProjectIds.includes(p.id))
-
-  console.log('Assigned Project IDs:', assignedProjectIds)
-  console.log('Assigned Projects:', assignedProjects)
+  const assignedProjectIds = leadTeam.assignedProjects?.map(p => p._id || p.id) || []
+  const assignedProjects = projects.value.filter(p => assignedProjectIds.includes(p._id || p.id))
 
   if (assignedProjects.length === 0) {
     noDataMessage.value = 'No projects assigned to your team.'
     return
   }
 
-  let completedCount = 0
-  let halfwayCount = 0
-  let uncompletedCount = 0
-
-  assignedProjects.forEach(project => {
-    if (project.progress === 100) {
-      completedCount++
-    } else if (project.progress > 50) {
-      halfwayCount++
-    } else {
-      uncompletedCount++
-    }
-  })
+  const [completedCount, halfwayCount, uncompletedCount] = assignedProjects.reduce(
+    ([c, h, u], p) => p.progress === 100 ? [c + 1, h, u] : p.progress > 50 ? [c, h + 1, u] : [c, h, u + 1],
+    [0, 0, 0]
+  )
 
   showChart.value = true
+  const ctx = chartCanvas.value?.getContext('2d')
+  if (!ctx) return
 
-  const ctx1 = chartCanvas.value?.getContext('2d')
-  if (!ctx1) {
-    console.error('Unable to get 2D context.')
-    return  
-  }
+  if (chartInstance.value) chartInstance.value.destroy()
 
-  if (chartInstance.value) {
-    chartInstance.value.destroy()
-  }
-
-  chartInstance.value = new Chart(ctx1, {
+  chartInstance.value = new Chart(ctx, {
     type: 'pie',
     data: {
       labels: ['Completed', 'Halfway', 'Uncompleted'],
       datasets: [{
-        label: 'Projects Status',
         data: [completedCount, halfwayCount, uncompletedCount],
         backgroundColor: ['#4CAF50', '#2196F3', '#FF5722'],
         borderColor: ['#388E3C', '#1976D2', '#D84315'],
@@ -170,15 +147,31 @@ onMounted(() => {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'top'
-        }
-      }
+      plugins: { legend: { position: 'top' } }
     }
   })
-})
+}
+
+onMounted(() => initializeDashboard())
+
+async function sendMessage() {
+  if (!newMessage.value.trim()) return
+  const msg = {
+    sender: currentUser.value?.name || 'Unknown',
+    content: newMessage.value,
+    timestamp: new Date().toISOString()
+  }
+  try {
+    await messageStore.addMessage(msg)
+    newMessage.value = ''
+  } catch (e) {
+    console.error('Message send failed:', e)
+  }
+}
+
+const latestMessage = computed(() => messageStore.messages.at(-1))
 </script>
+
 
 <style scoped>
 body {

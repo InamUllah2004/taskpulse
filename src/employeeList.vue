@@ -4,8 +4,8 @@
     <h2>All Users</h2>
 
     <ul class="user-list">
-      <li v-for="user in userStore.users" :key="user.id" class="user-card">
-        <p><strong>ID:</strong> {{ user.id }}</p>
+      <li v-for="user in users" :key="user._id || user.id" class="user-card">
+        <p><strong>ID:</strong> {{ user._id || user.id }}</p>
         <p><strong>Name:</strong> {{ user.name }}</p>
         <p><strong>Email:</strong> {{ user.email }}</p>
         <p><strong>Password:</strong> {{ user.password }}</p>
@@ -14,16 +14,27 @@
       </li>
     </ul>
 
-    <div v-if="userStore.users.length === 0">
+    <div v-if="users.length === 0">
       No users found.
     </div>
   </div>
 </template>
 <script setup>
-import { useUserStore } from './store/userStore'
-import header from './components/header.vue';
+import { ref, onMounted } from 'vue'
 import Header from './components/header.vue';
-const userStore = useUserStore()
+const users = ref([])
+
+onMounted(async () => {
+  try {
+    const res = await fetch('http://localhost:3000/api/users')
+    if (res.ok) {
+      users.value = await res.json()
+    }
+  } catch (e) {
+    // Optionally handle error
+    users.value = []
+  }
+})
 </script>
 <style scoped>
 .user-list {

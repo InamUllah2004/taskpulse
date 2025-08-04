@@ -1,38 +1,38 @@
+
 <template>
-  <Header :role="'projectDirector'"/>
+  <Header :role="'projectDirector'" />
   <div class="dashboard">
     <h1>Project Director Dashboard</h1>
-     <div class="section">
-   <h2>View Teams</h2>
-   <div v-if="!teams || teams.length === 0" class="no-teams">
-      No teams created yet.
-    </div>
-
-    <div v-else>
-      <div v-for="team in teams" :key="team.id" class="team-block">
-        <p>
-          <strong>Lead:</strong>
-          {{ team.teamLead && team.teamLead.name ? team.teamLead.name : 'No lead assigned' }}
-        </p>
-         <p><strong>Developers:</strong></p>
-        <ul>
-          <li v-for="(dev, index) in team.developers" :key="dev.id || index">
-            <div v-if="dev && dev.name">
-              {{ dev.name }}
-            </div>
-          </li>
-        </ul>
+    <div class="section">
+      <h2>View Teams</h2>
+      <div v-if="!teams.length" class="no-teams">
+        No teams created yet.
+      </div>
+      <div v-else>
+        <div v-for="team in teams" :key="team._id || team.id" class="team-block">
+          <p>
+            <strong>Lead:</strong>
+            {{ team.teamLead && team.teamLead.name ? team.teamLead.name : 'No lead assigned' }}
+          </p>
+          <p><strong>Developers:</strong></p>
+          <ul>
+            <li v-for="(dev, index) in team.developers" :key="dev._id || dev.id || index">
+              <div v-if="dev && dev.name">
+                {{ dev.name }}
+              </div>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
-  </div>
-   
-  <div class="section">
+
+    <div class="section">
       <h2>Create New Team</h2>
       <form @submit.prevent="createTeam">
         <label>Team Lead:
           <select v-model="newTeam.leadId" required>
             <option disabled value="">Select Lead</option>
-            <option v-for="lead in availableLeads" :key="lead.id" :value="lead.id">
+            <option v-for="lead in availableLeads" :key="lead._id || lead.id" :value="lead._id || lead.id">
               {{ lead.name }}
             </option>
           </select>
@@ -40,7 +40,7 @@
 
         <label>Developers (Select up to 4):
           <select v-model="newTeam.developerIds" multiple required>
-            <option v-for="dev in availableDevelopers" :key="dev.id" :value="dev.id">
+            <option v-for="dev in availableDevelopers" :key="dev._id || dev.id" :value="dev._id || dev.id">
               {{ dev.name }}
             </option>
           </select>
@@ -50,115 +50,179 @@
       </form>
     </div>
     <div class="section">
-  <h2>Assign Project to Team</h2>
-  <form @submit.prevent="assignProjectToTeam">
-    <label>Team:
-      <select v-model="selectedTeamId" required>
-        <option disabled value="">Select Team</option>
-        <option v-for="team in teams" :key="team.id" :value="team.id">
-          Team {{ team.id }} ({{ team.teamLead?.name || 'No Lead' }})
-        </option>
-      </select>
-    </label>
+      <h2>Assign Project to Team</h2>
+      <form @submit.prevent="assignProjectToTeam">
+        <label>Team:
+          <select v-model="selectedTeamId" required>
+            <option disabled value="">Select Team</option>
+            <option v-for="team in teams" :key="team._id || team.id" :value="team._id || team.id">
+              Team {{ team._id || team.id }} ({{ team.teamLead?.name || 'No Lead' }})
+            </option>
+          </select>
+        </label>
 
-    <label>Project:
-      <select v-model="selectedProjectId" required>
-        <option disabled value="">Select Project</option>
-        <option v-for="project in availableProjects" :key="project.id" :value="project.id">
-          {{ project.name }}
-        </option>
-      </select>
-    </label>
+        <label>Project:
+          <select v-model="selectedProjectId" required>
+            <option disabled value="">Select Project</option>
+            <option v-for="project in availableProjects" :key="project._id || project.id" :value="project._id || project.id">
+              {{ project.name }}
+            </option>
+          </select>
+        </label>
 
-    <button type="submit">Assign Project</button>
-  </form>
- </div>
-</div>
+        <button type="submit">Assign Project</button>
+      </form>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useTeamStore } from './store/teamStore'
-import { useUserStore } from './store/userStore'
+
+import { ref, computed, onMounted } from 'vue'
 import Header from './components/header.vue'
-import {Team} from './store/team'
-import { onMounted, toValue } from 'vue'
-import { useProjectStore } from './store/projectStore'
-// Stores
-const teamStore = useTeamStore()
-const userStore = useUserStore()
-const project = useProjectStore()
 
-onMounted(() => {
-  console.log(toValue(teams)[0].developers[0].name)
-})
+const teams = ref([])
+const users = ref([])
+const projects = ref([])
+const newTeam = ref({ leadId: '', developerIds: [] })
+const selectedTeamId = ref('')
+const selectedProjectId = ref('')
 
-const teams = computed(() => teamStore.teams)
-// Reactive form data
-const newTeam = ref({
-  leadId: '',
-  developerIds: []
-})
+// Fetch all data from backend
+async function fetchAll() {
+  try {
+    const [teamRes, userRes, projectRes] = await Promise.all([
+      fetch('http://localhost:3000/api/teams'),
+      fetch('http://localhost:3000/api/users'),
+      fetch('http://localhost:3000/api/projects')
+    ])
 
-// Computed options for dropdowns
-const availableLeads = computed(() =>
-  userStore.users.filter(user => user.role === 'teamLead' && user.available === 0)
-);
-const availableDevelopers = computed(() =>
-  userStore.users.filter(user => user.role === 'developer' && user.available === 0)
-); 
+    teams.value = teamRes.ok ? await teamRes.json() : []
+    users.value = userRes.ok ? await userRes.json() : []
+    projects.value = projectRes.ok ? await projectRes.json() : []
 
-// createTeam function from before
-function createTeam() {
-  const developerIds = newTeam.value.developerIds.map(id => Number(id));
-  const leadId = Number(newTeam.value.leadId);
+    alert(`Fetched ${users.value.length} users`)
+    alert(`Fetched ${teams.value.length} teams`)
+    alert(`Fetched ${projects.value.length} projects`)
 
-  const lead = userStore.users.find(u => u.id === leadId);
-  const developers = developerIds.map(id => userStore.users.find(u => u.id === id));
+    console.log('Users:', users.value)
+    console.log('Teams:', teams.value)
+    console.log('Projects:', projects.value)
 
-  if (!lead || developers.length !== 4) {
-    alert("Please select one team lead and exactly 4 developers.");
-    return;
+  } catch (e) {
+    alert('Error fetching data: ' + e.message)
+    console.error('FetchAll Error:', e)
+    teams.value = []
+    users.value = []
+    projects.value = []
   }
-
-  const team = new Team();
-  team.teamLead = lead;
-  team.developers = developers;
-
-  teamStore.addTeam(team);
-
-  // ✅ mark users as unavailable using updateAvailability
-  userStore.updateAvailability(lead.id, 1);
-  developers.forEach(dev => userStore.updateAvailability(dev.id, 1));
-
-  // ✅ reset form
-  newTeam.value.leadId = '';
-  newTeam.value.developerIds = [];
 }
-const selectedTeamId = ref('');
-const selectedProjectId = ref('');
+
+onMounted(fetchAll)
+
+const availableLeads = computed(() =>
+  users.value.filter(user => user.role === 'teamLead' && user.available === 0)
+)
+
+const availableDevelopers = computed(() =>
+  users.value.filter(user => user.role === 'developer' && user.available === 0)
+)
 
 const availableProjects = computed(() =>
-  project.projects?.filter(p => p && p.name) || []
-);
+  projects.value?.filter(p => p && p.name) || []
+)
+async function createTeam() {
+  const developerIds = newTeam.value.developerIds.filter(Boolean);
+  const leadId = newTeam.value.leadId;
 
-function assignProjectToTeam() {
-  const teamId = Number(selectedTeamId.value);
-  const projectId = Number(selectedProjectId.value);
-
-  if (!teamId || !projectId) {
-    alert("Please select both a team and a project.");
+  if (!leadId || developerIds.length !== 4) {
+    alert('Please select one team lead and exactly 4 developers.');
     return;
   }
 
-  teamStore.assignToProject(teamId, projectId);
+  const lead = users.value.find(u => u._id === leadId || u.id === leadId);
+  const developers = developerIds.map(id => users.value.find(u => u._id === id || u.id === id));
 
-  // reset form
-  selectedTeamId.value = '';
-  selectedProjectId.value = '';
+  if (!lead || developers.includes(undefined)) {
+    alert('Invalid team lead or developers.');
+    return;
+  }
+
+  // Create team object
+  const teamObj = {
+    teamLead: { ...lead, available: 1 },
+    developers: developers.map(dev => ({ ...dev, available: 1 })),
+    assignedProjects: [],
+    sprintAssignments: []
+  };
+
+  try {
+    // Create the team first
+    const res = await fetch('http://localhost:3000/api/teams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(teamObj)
+    });
+
+    if (res.ok) {
+      // Now update lead's availability in DB
+      await fetch(`http://localhost:3000/api/users/${lead._id || lead.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ available: 1 })
+      });
+
+      // Update each developer’s availability
+      for (const dev of developers) {
+        await fetch(`http://localhost:3000/api/users/${dev._id || dev.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ available: 1 })
+        });
+      }
+
+      await fetchAll(); // Refresh data
+      newTeam.value.leadId = '';
+      newTeam.value.developerIds = [];
+    } else {
+      alert('Failed to create team.');
+    }
+  } catch (e) {
+    alert('Failed to create team: ' + e.message);
+    console.error(e);
+  }
 }
 
 
+async function assignProjectToTeam() {
+  const teamId = selectedTeamId.value
+  const projectId = selectedProjectId.value
+  if (!teamId || !projectId) {
+    alert('Please select both a team and a project.')
+    return
+  }
+  // Find team and update assignedProjects
+  const team = teams.value.find(t => t._id === teamId || t.id === teamId)
+  if (!team) return
+  if (!team.assignedProjects) team.assignedProjects = []
+  if (!team.assignedProjects.includes(projectId)) team.assignedProjects.push(projectId)
+  try {
+    const res = await fetch(`http://localhost:3000/api/teams/${team._id || team.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(team)
+    })
+    if (res.ok) {
+      await fetchAll()
+      selectedTeamId.value = ''
+      selectedProjectId.value = ''
+    } else {
+      alert('Failed to assign project.')
+    }
+  } catch (e) {
+    alert('Failed to assign project: ' + e.message)
+  }
+}
 </script>
 
 <style scoped>
@@ -180,7 +244,7 @@ h1 {
   border-radius: 10px;
   padding: 20px;
   margin-bottom: 30px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
 label {
@@ -189,7 +253,9 @@ label {
   font-weight: bold;
 }
 
-input, select, button {
+input,
+select,
+button {
   width: 100%;
   margin-top: 4px;
   margin-bottom: 15px;
@@ -216,9 +282,9 @@ button:hover {
 .developer {
   margin-left: 15px;
 }
-h2{
-  color:red;
+
+h2 {
+  color: red;
   text-decoration: underline;
 }
-</style> 
-
+</style>

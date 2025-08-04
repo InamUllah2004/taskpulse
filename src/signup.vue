@@ -48,15 +48,11 @@ const store = useUserStore()
 const validateEmail = () => /^[\w.+\-]+@gmail\.com$/.test(email.value)
 const validatePassword = () => /^[A-Z].*/.test(password.value)
 
-const handleClick = () => {
-  const emailExists = store.users.some(user => user.email === email.value)
-
+const handleClick = async () => {
   if (!name.value) {
     errorMessage.value = 'Name is required.'
   } else if (!validateEmail()) {
     errorMessage.value = 'Email must end with @gmail.com'
-  } else if (emailExists) {
-    errorMessage.value = 'Email already exists. Please use another email.'
   } else if (!validatePassword()) {
     errorMessage.value = 'Password must start with a capital letter'
   } else if (password.value !== confirmPassword.value) {
@@ -65,13 +61,44 @@ const handleClick = () => {
     errorMessage.value = 'Please select a role'
   } else {
     errorMessage.value = ''
-    store.addUser(name.value, email.value, password.value, selectedRole.value)
-    alert(`Sign Up Successful as ${selectedRole.value}`)
-    name.value = ''
-    email.value = ''
-    password.value = ''
-    confirmPassword.value = ''
-    selectedRole.value = ''
+    // Check if email exists in DB
+    try {
+      const checkRes = await fetch('http://localhost:3000/api/users');
+      const users = checkRes.ok ? await checkRes.json() : [];
+      const emailExists = users.some(user => user.email === email.value);
+      if (emailExists) {
+        errorMessage.value = 'Email already exists. Please use another email.';
+        return;
+      }
+    } catch (e) {
+      errorMessage.value = 'Could not verify email. Try again.';
+      return;
+    }
+    // Insert user in MongoDB
+    try {
+      const res = await fetch('http://localhost:3000/api/users/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.value,
+          email: email.value,
+          password: password.value,
+          role: selectedRole.value
+        })
+      });
+      if (res.ok) {
+        alert(`Sign Up Successful as ${selectedRole.value} (saved to DB)`);
+        name.value = '';
+        email.value = '';
+        password.value = '';
+        confirmPassword.value = '';
+        selectedRole.value = '';
+      } else {
+        errorMessage.value = 'Failed to save user to DB.';
+      }
+    } catch (e) {
+      errorMessage.value = 'Sign Up failed. Try again.';
+    }
   }
 }
 </script>

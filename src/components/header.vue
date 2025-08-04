@@ -21,7 +21,6 @@
       <template v-else-if="role === 'developer'">
         <a @click="navigateTo('/dashBoard2')">Home</a>
         <a @click="navigateTo('/my-sprints')">My Tasks</a>
-        <a @click="navigateTo('/submitWork')">Submit Work</a>
       </template>
 
       <!-- If needed, you can add default content or leave blank -->

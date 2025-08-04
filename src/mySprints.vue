@@ -3,7 +3,7 @@
   <div class="my-sprints">
     <h2>🚩 My Assigned Sprints & Tasks</h2>
     <div v-if="assignedSprints.length">
-      <div v-for="sprintInfo in assignedSprints" :key="sprintInfo.sprint.id" class="sprint-section">
+      <div v-for="sprintInfo in assignedSprints" :key="sprintInfo.sprint._id" class="sprint-section">
         <h3>
           {{ sprintInfo.project.name }} — {{ sprintInfo.sprint.name }}
         </h3>
@@ -17,7 +17,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="task in sprintInfo.sprint.tasks.filter(t => t.status !== 'done' && !t.completed)" :key="task.id">
+            <tr v-for="task in sprintInfo.sprint.tasks.filter(t => t.status !== 'done' && !t.completed)" :key="task._id">
               <td>{{ task.title }}</td>
               <td>{{ task.description }}</td>
               <td>
@@ -25,15 +25,10 @@
               </td>
               <td>
                 <template v-if="!isTaskAssignedToMe(task)">
-                  <button class="assign-btn" @click="assignToMe(task)">Assign to Me</button>
+                  <button class="assign-btn" @click="assignToMe(task, sprintInfo)">Assign to Me</button>
                 </template>
                 <template v-else>
-                  <button
-                    class="complete-btn"
-                    @click="markComplete(task)"
-                  >
-                    Mark Complete
-                  </button>
+                  <button class="complete-btn" @click="markComplete(task, sprintInfo)">Mark Complete</button>
                 </template>
               </td>
             </tr>
@@ -49,93 +44,91 @@
 
 <script setup>
 import Header from './components/header.vue'
-import { computed } from 'vue'
-import { useUserStore } from './store/userStore'
-import { useProjectStore } from './store/projectStore'
-import { useTeamStore } from './store/teamStore'
+import { ref, onMounted, computed } from 'vue'
 
-const userStore = useUserStore()
-const projectStore = useProjectStore()
-const teamStore = useTeamStore()
+const currentUser = ref(null)
+const assignedSprints = ref([])
 
-const currentUser = computed(() =>
-  userStore.users.find(u => u.email === userStore.currentEmail)
-)
-const currentEmail = computed(() => userStore.currentEmail)
+onMounted(async () => {
+  const email = localStorage.getItem('currentEmail')
+  const userRes = await fetch('http://localhost:3000/api/users')
+  const users = await userRes.json()
+  currentUser.value = users.find(u => u.email === email)
+  if (!currentUser.value) return alert('❌ Current user not found.')
 
-// Find the team the developer belongs to
-const currentTeam = computed(() =>
-  teamStore.teams.find(t =>
-    Array.isArray(t.developers) && t.developers.some(dev => dev?.email === currentUser.value?.email)
+  const teamsRes = await fetch('http://localhost:3000/api/teams')
+  const teams = await teamsRes.json()
+  const currentTeam = teams.find(team =>
+    team.developers.some(dev => dev.email === currentUser.value.email)
   )
-)
+  if (!currentTeam) return alert('⚠️ No team found for this user.')
 
-// Find all sprints assigned to this developer via sprintAssignments
-const assignedSprints = computed(() => {
-  if (!currentUser.value || !currentTeam.value) return []
-  const sprintAssignments = Array.isArray(currentTeam.value.sprintAssignments)
-    ? currentTeam.value.sprintAssignments
-    : []
-  return sprintAssignments
-    .filter(a => Array.isArray(a.developerIds) && a.developerIds.includes(currentUser.value.id))
-    .map(a => {
-      const project = projectStore.projects.find(p => p.id === a.projectId)
-      const sprint = project?.sprints?.find(s => s.id === a.sprintId)
-      return { project, sprint }
-    })
-    .filter(a => a.sprint && a.project)
+  const projectsRes = await fetch('http://localhost:3000/api/projects')
+  const projects = await projectsRes.json()
+
+  const assignments = currentTeam.sprintAssignments.filter(assign =>
+    assign.developerIds.includes(currentUser.value._id)
+  )
+
+  for (const assign of assignments) {
+    const project = projects.find(p => p._id === assign.projectId)
+    const sprint = project?.sprints.find(s => s._id === assign.sprintId)
+    if (project && sprint) {
+      assignedSprints.value.push({ project, sprint })
+    }
+  }
 })
 
-// Check if the task is assigned to the current user (by email)
 function isTaskAssignedToMe(task) {
   if (!task.assignedTo) return false
   if (Array.isArray(task.assignedTo)) {
-    return task.assignedTo.includes(currentEmail.value)
+    return task.assignedTo.includes(currentUser.value.email)
   }
-  return task.assignedTo === currentEmail.value
+  return task.assignedTo === currentUser.value.email
 }
 
-// Assign the task to the current user (by email)
-function assignToMe(task) {
-  // Find the actual task in the store and update assignedTo
-  for (const sprintInfo of assignedSprints.value) {
-    const storeProject = projectStore.projects.find(p => p.id === sprintInfo.project.id)
-    const storeSprint = storeProject?.sprints?.find(s => s.id === sprintInfo.sprint.id)
-    const storeTask = storeSprint?.tasks?.find(t => t.id === task.id)
-    if (storeTask) {
-      if (!storeTask.assignedTo) {
-        storeTask.assignedTo = [currentEmail.value]
-      } else if (Array.isArray(storeTask.assignedTo)) {
-        if (!storeTask.assignedTo.includes(currentEmail.value)) {
-          storeTask.assignedTo.push(currentEmail.value)
-        }
-      } else {
-        storeTask.assignedTo = [storeTask.assignedTo, currentEmail.value]
-      }
-      if (typeof projectStore.saveToLocalStorage === 'function') {
-        projectStore.saveToLocalStorage()
-      }
-      break
-    }
+async function assignToMe(task, sprintInfo) {
+  const projectRes = await fetch(`http://localhost:3000/api/projects/${sprintInfo.project._id}`);
+  const project = await projectRes.json();
+
+  const sprint = project.sprints.find(s => s._id === sprintInfo.sprint._id);
+  if (!sprint) return alert('Sprint not found');
+
+  const storeTask = sprint.tasks.find(t => t._id === task._id);
+  if (!storeTask) return alert('Task not found');
+
+  storeTask.assignedTo = currentUser.value._id; // or use .email only if you store email
+  storeTask.status = 'in-progress';
+
+  // ✅ Capture the response in updateRes
+  const updateRes = await fetch(`http://localhost:3000/api/projects/${project._id}/sprints/${sprint._id}/tasks`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task: storeTask })
+  });
+
+  if (!updateRes.ok) {
+    const err = await updateRes.json();
+    alert(`❌ Failed to assign task: ${err.message}`);
+  } else {
+    alert('✅ Task assigned successfully!');
   }
 }
 
-// Mark the task as complete
-function markComplete(task) {
-  // Find the actual task in the store and update completed
-  for (const sprintInfo of assignedSprints.value) {
-    const storeProject = projectStore.projects.find(p => p.id === sprintInfo.project.id)
-    const storeSprint = storeProject?.sprints?.find(s => s.id === sprintInfo.sprint.id)
-    const storeTask = storeSprint?.tasks?.find(t => t.id === task.id)
-    if (storeTask && isTaskAssignedToMe(storeTask)) {
-      storeTask.completed = true
-      storeTask.status = 'done'
-      if (typeof projectStore.saveToLocalStorage === 'function') {
-        projectStore.saveToLocalStorage()
-      }
-      break
-    }
-  }
+
+
+async function markComplete(task, sprintInfo) {
+  const projectRes = await fetch(`http://localhost:3000/api/projects/${sprintInfo.project._id}`)
+  const project = await projectRes.json()
+  const sprint = project.sprints.find(s => s._id === sprintInfo.sprint._id)
+  const storeTask = sprint.tasks.find(t => t._id === task._id)
+  storeTask.completed = true
+  storeTask.status = 'done'
+  await fetch(`http://localhost:3000/api/projects/${project._id}/sprints/${sprint._id}/tasks`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task: storeTask })
+  })
 }
 </script>
 

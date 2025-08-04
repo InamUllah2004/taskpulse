@@ -4,46 +4,36 @@
     <h1 class="title">Sprint Management</h1>
 
     <ul class="project-list">
-      <li
-        v-for="project in projectStore.projects"
-        :key="project.id"
-        class="project-card"
-      >
+      <li v-for="project in projects" :key="project._id || project.id" class="project-card">
         <div class="project-header">
           <div>
             <h3 class="project-name">{{ project.name }}</h3>
             <p class="project-description">{{ project.description }}</p>
           </div>
-          <button @click="toggleProject(project.id)" class="btn-primary">
-            {{ openProjectId === project.id ? 'Hide Sprints' : 'Manage Sprints' }}
+          <button @click="toggleProject(project._id || project.id)" class="btn-primary">
+            {{ openProjectId === (project._id || project.id) ? 'Hide Sprints' : 'Manage Sprints' }}
           </button>
         </div>
 
-        <!-- Expanded Sprint Section -->
-        <div v-if="openProjectId === project.id" class="sprint-section">
+        <div v-if="openProjectId === (project._id || project.id)" class="sprint-section">
           <h4 class="sprint-title">Sprints for: {{ project.name }}</h4>
 
           <ul v-if="project.sprints?.length" class="sprint-list">
-            <li
-              v-for="sprint in project.sprints"
-              :key="sprint.id"
-              class="sprint-card"
-            >
+            <li v-for="sprint in project.sprints" :key="sprint.id" class="sprint-card">
               <div>
                 <strong>{{ sprint.name }}</strong> ({{ sprint.startDate }} → {{ sprint.endDate }})
                 <p class="sprint-goal">{{ sprint.goal }}</p>
               </div>
               <div class="task-buttons">
-                  <button class="add-btn" @click="openTaskModal(sprint)">Add Task</button>
-                  <button class="view-btn" @click="openViewModal(sprint)">View Tasks</button>
-                  <button class="delete-btn" @click="deleteSprint(project.id, sprint.id)">Delete</button>
+                <button class="add-btn" @click="openTaskModal(project._id || project.id, sprint.id)">Add Task</button>
+                <button class="view-btn" @click="openViewModal(sprint.id, project._id || project.id)">View Tasks</button>
+                <button class="delete-btn" @click="deleteSprint(project._id || project.id, sprint.id)">Delete</button>
               </div>
-
-              </li>
+            </li>
           </ul>
           <p v-else>No sprints found for this project.</p>
 
-          <form @submit.prevent="handleAddSprint(project.id)" class="sprint-form">
+          <form @submit.prevent="handleAddSprint(project._id || project.id)" class="sprint-form">
             <input v-model="sprintData.name" placeholder="Sprint Name" required />
             <input v-model="sprintData.goal" placeholder="Sprint Goal" required />
             <input v-model="sprintData.startDate" type="date" required />
@@ -61,116 +51,153 @@
         <form @submit.prevent="addTask">
           <input v-model="taskData.title" placeholder="Task Title" required />
           <input v-model="taskData.description" placeholder="Task Description" required />
-           <div class="task-buttons">
-          <button type="submit" class="add-btn">Add Task</button>
-          <button type="button" class="delete-btn" @click="closeTaskModal">Close</button>
+          <div class="task-buttons">
+            <button type="submit" class="add-btn">Add Task</button>
+            <button type="button" class="delete-btn" @click="closeTaskModal">Close</button>
           </div>
         </form>
       </div>
     </div>
 
     <!-- View Tasks Modal -->
-   <div v-if="viewSprint" class="modal-overlay">
-    <div class="modal">
-     <h3>Tasks for: {{ viewSprint.name }}</h3>
-      <div v-if="viewSprint.tasks?.length">
-      <ul>
-         <li v-for="task in viewSprint.tasks" :key="task.id">
-          <strong>{{ task.title }}</strong> - {{ task.description }} 
-          <em>({{ task.status }})</em>
-        </li>
-       </ul>
+    <div v-if="viewSprint" class="modal-overlay">
+      <div class="modal">
+        <h3>Tasks for: {{ viewSprint.name }}</h3>
+        <div v-if="viewSprint.tasks?.length">
+          <ul>
+            <li v-for="task in viewSprint.tasks" :key="task.id">
+              <strong>{{ task.title }}</strong> - {{ task.description }} <em>({{ task.status }})</em>
+            </li>
+          </ul>
+        </div>
+        <p v-else>No tasks added to this sprint.</p>
+        <button class="btn-primary" @click="closeViewModal">Close</button>
       </div>
-      <p v-else>No tasks added to this sprint.</p>
-    <button class="btn-primary" @click="closeViewModal">Close</button>
     </div>
-  </div>
-
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { useProjectStore } from './store/projectStore'
-import { Sprint } from './store/sprint'
-import { useTaskStore } from './store/taskStore'
-import { Task } from './store/task'
 import Header from './components/header.vue'
 
-const projectStore = useProjectStore()
-const taskStore = useTaskStore()
-
+const projects = ref([])
 const openProjectId = ref(null)
 const selectedSprint = ref(null)
+const selectedProjectId = ref(null)
 const viewSprint = ref(null)
+const sprintData = ref({ name: '', goal: '', startDate: '', endDate: '' })
+const taskData = ref({ title: '', description: '' })
 
-function openViewModal(sprint) {
-  viewSprint.value = sprint
+async function fetchProjects() {
+  const res = await fetch('http://localhost:3000/api/projects')
+  const data = await res.json()
+  projects.value = data.map(p => ({ ...p, sprints: p.sprints || [] }))
 }
-
-function closeViewModal() {
-  viewSprint.value = null
-}
-
-const sprintData = ref({
-  name: '',
-  goal: '',
-  startDate: '',
-  endDate: ''
-})
-
-const taskData = ref({
-  title: '',
-  description: ''
-})
+fetchProjects()
 
 function toggleProject(projectId) {
   openProjectId.value = openProjectId.value === projectId ? null : projectId
 }
 
-function handleAddSprint(projectId) {
-  const { name, goal, startDate, endDate } = sprintData.value
-  if (!name || !goal || !startDate || !endDate) {
-    alert('Please fill in all fields.')
-    return
-  }
-  if (new Date(endDate) <= new Date(startDate)) {
-    alert('End date must be after the start date!')
-    return
-  }
-  const newSprint = new Sprint(name, goal, startDate, endDate)
-  projectStore.addSprint(projectId, newSprint)
-  sprintData.value = { name: '', goal: '', startDate: '', endDate: '' }
-}
-
-function deleteSprint(projectId, sprintId) {
-  const project = projectStore.projects.find(p => p.id === projectId)
-  if (project) {
-    project.sprints = project.sprints.filter(s => s.id !== sprintId)
-    projectStore.saveToLocalStorage()
+function openViewModal(sprintId, projectId) {
+  const project = projects.value.find(p => p._id === projectId || p.id === projectId);
+  const sprint = project?.sprints?.find(s => s.id === sprintId);
+  if (sprint) {
+    viewSprint.value = JSON.parse(JSON.stringify({ ...sprint, tasks: sprint.tasks || [] }));
   }
 }
+function closeViewModal() {
+  viewSprint.value = null
+}
 
-function openTaskModal(sprint) {
-  selectedSprint.value = sprint
-  taskData.value = { title: '', description: '' }
+function openTaskModal(projectId, sprintId) {
+  const project = projects.value.find(p => p._id === projectId || p.id === projectId)
+  const sprint = project?.sprints?.find(s => s.id === sprintId)
+  if (sprint) {
+    selectedProjectId.value = projectId
+    selectedSprint.value = JSON.parse(JSON.stringify({ ...sprint, tasks: sprint.tasks || [] }))
+    taskData.value = { title: '', description: '' }
+  }
 }
 
 function closeTaskModal() {
   selectedSprint.value = null
+  selectedProjectId.value = null
 }
 
-function addTask() {
-  if (!taskData.value.title || !taskData.value.description) {
-    alert('Please fill in both fields.')
-    return
+async function handleAddSprint(projectId) {
+  const { name, goal, startDate, endDate } = sprintData.value;
+  if (new Date(endDate) <= new Date(startDate)) return alert('End date must be after start date!');
+
+  const newSprint = {
+    id: Date.now(),
+    name,
+    goal,
+    startDate,
+    endDate,
+    tasks: []
+  };
+
+  try {
+    const response = await fetch(`http://localhost:3000/api/projects/${projectId}/sprints`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sprint: newSprint })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Failed to add sprint');
+    alert('Sprint added!');
+    sprintData.value = { name: '', goal: '', startDate: '', endDate: '' };
+    fetchProjects();
+  } catch (error) {
+    console.error(error.message);
+    alert('Error adding sprint.');
   }
-  const newTask = taskStore.addTask(taskData.value.title, taskData.value.description)
-  selectedSprint.value.tasks = selectedSprint.value.tasks || []
-  selectedSprint.value.tasks.push(newTask)
-  projectStore.saveToLocalStorage()
-  closeTaskModal()
 }
+
+async function deleteSprint(projectId, sprintId) {
+  await fetch(`http://localhost:3000/api/projects/${projectId}/sprints/${sprintId}`, {
+    method: 'DELETE'
+  })
+  fetchProjects()
+}
+
+const addTask = async () => {
+  const projectId = selectedProjectId.value;
+  const sprintId = selectedSprint.value?.id || selectedSprint.value?._id;
+
+  if (!projectId || !sprintId) {
+    console.error('❌ Missing projectId or sprintId');
+    return;
+  }
+
+  const newTask = {
+    id: Date.now(),
+    title: taskData.value.title,
+    description: taskData.value.description,
+    status: 'todo'
+  };
+
+  try {
+    const res = await fetch(`http://localhost:3000/api/projects/${projectId}/sprints/${sprintId}/tasks`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: newTask })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to add task');
+
+    await fetchProjects();
+    closeTaskModal();
+
+    console.log('✅ Task added:', data);
+  } catch (err) {
+    console.error('❌ Error adding task:', err.message);
+  }
+};
 </script>
 
 <style scoped>

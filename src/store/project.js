@@ -7,8 +7,8 @@ export class Project {
     this.id = Project.projectID++;
     this.name = name;
     this.description = description;
-    this.assignedTeam = null; // will store a User object later
-    this.sprints = [];        // array of sprint objects
+    this.assignedTeam = null; 
+    this.sprints = [];        
     this.progress = 0;
     Project.setID();
   }

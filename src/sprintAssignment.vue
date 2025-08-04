@@ -1,195 +1,209 @@
 <template>
   <Header :role="'teamLead'" />
-  <div class="sprint-assignment">
-    <h2>🧩 Assign Developers to Sprints</h2>
+  <div class="container">
+    <h2 class="heading">Sprint Assignment</h2>
 
-    <div v-if="teamProjects.length">
-      <h3>Select a Project:</h3>
-      <ul>
-        <li v-for="project in teamProjects" :key="project.id">
-          <button @click="selectProject(project)">
-            {{ project.name }}
-          </button>
-        </li>
-      </ul>
+    <div class="project-selection">
+      <h3>Select Project:</h3>
+      <div v-if="teamProjects.length">
+        <button
+          v-for="project in teamProjects"
+          :key="project._id"
+          class="project-button"
+          @click="selectProject(project)"
+        >
+          {{ project.name }}
+        </button>
+      </div>
+      <p v-else>No assigned projects found.</p>
     </div>
-    <div v-else>No projects assigned to your team.</div>
 
-    <div v-if="selectedProject">
-      <h3>Sprints for {{ selectedProject.name }}</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Sprint</th>
-            <th>Assign Developer(s)</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="sprint in selectedProject.sprints" :key="sprint.id">
-            <td>{{ sprint.name }}</td>
-            <td>
-              <select
-                multiple
-                v-model="selectedDevelopers[sprint.id]"
-                class="multi-select"
-              >
-                <option
-                  v-for="dev in teamDevelopers"
-                  :key="dev.id"
-                  :value="dev.id"
-                >
-                  {{ dev.name }}
-                </option>
-              </select>
-            </td>
-            <td>
-              <button
-                @click="assignSprint(sprint.id)"
-                :disabled="!selectedDevelopers[sprint.id]?.length"
-                class="assign-btn"
-              >
-                Assign
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-if="selectedProject" class="sprint-assignment">
+      <h3>Sprints in {{ selectedProject.name }}</h3>
+      <div
+        v-for="sprint in selectedProject.sprints"
+        :key="sprint._id"
+        class="sprint-card"
+      >
+        <h4>{{ sprint.name }}</h4>
+        <label>Select Developers:</label>
+        <select v-model="selectedDevelopers[sprint._id]" multiple>
+          <option
+            v-for="dev in teamDevelopers"
+            :key="dev._id"
+            :value="dev._id"
+          >
+            {{ dev.email }}
+          </option>
+        </select>
+        <button @click="assignSprint(sprint._id)">Assign</button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useUserStore } from './store/userStore'
-import { useTeamStore } from './store/teamStore'
-import { useProjectStore } from './store/projectStore'
+import { ref, computed, onMounted } from 'vue'
 import Header from './components/header.vue'
+import { useUserContext } from './store/userContext'
 
-const userStore = useUserStore()
-const teamStore = useTeamStore()
-const projectStore = useProjectStore()
+const users = ref([])
+const teams = ref([])
+const projects = ref([])
 
-const currentUser = computed(() =>
-  userStore.users.find(u => u.email === userStore.currentEmail)
-)
-
-const currentTeam = computed(() =>
-  teamStore.teams.find(t => t.teamLead?.email === currentUser.value?.email)
-)
-
-const teamDevelopers = computed(() =>
-  currentTeam.value?.developers?.filter(dev => dev !== null) || []
-)
-
-const teamProjects = computed(() =>
-  projectStore.projects.filter(p =>
-    currentTeam.value?.assignedProjects?.includes(p.id)
-  )
-)
-
+const myTeam = ref(null)
 const selectedProject = ref(null)
 const selectedDevelopers = ref({})
+const { currentEmail } = useUserContext()
+
+if (!currentEmail.value) {
+  const stored = localStorage.getItem('currentEmail')
+  if (stored) currentEmail.value = stored
+}
+
+onMounted(async () => {
+  try {
+    const [userRes, teamRes, projectRes] = await Promise.all([
+      fetch('http://localhost:3000/api/users'),
+      fetch('http://localhost:3000/api/teams'),
+      fetch('http://localhost:3000/api/projects')
+    ])
+
+    users.value = userRes.ok ? await userRes.json() : []
+    teams.value = teamRes.ok ? await teamRes.json() : []
+    projects.value = projectRes.ok ? await projectRes.json() : []
+
+    const email = localStorage.getItem('currentEmail')
+    const team = teams.value.find(t => t.teamLead?.email === email)
+
+    if (team) {
+      myTeam.value = team
+      alert(`Welcome, ${team.teamLead.name}!`)
+    } else {
+      alert('You are not part of any team.')
+    }
+  } catch (e) {
+    console.error('Data fetch error:', e)
+    alert('Failed to load data.')
+  }
+})
+
+const teamDevelopers = computed(() => {
+  if (!myTeam.value?.developers) return []
+  return users.value.filter(user =>
+    myTeam.value.developers.some(dev =>
+      typeof dev === 'object' ? dev._id === user._id : dev === user._id
+    )
+  )
+})
+
+const teamProjects = computed(() => {
+  return Array.isArray(myTeam.value?.assignedProjects)
+    ? myTeam.value.assignedProjects
+    : []
+})
 
 const selectProject = (project) => {
   selectedProject.value = project
   selectedDevelopers.value = {}
 
-  let sprintAssignments = currentTeam.value?.sprintAssignments
-  if (!Array.isArray(sprintAssignments)) {
-    sprintAssignments = []
-  }
-  for (const sprint of project.sprints) {
-    const match = sprintAssignments.find(
-      a => a.projectId === project.id && a.sprintId === sprint.id
+  const sprintAssignments = myTeam.value?.sprintAssignments || []
+  for (const sprint of project.sprints || []) {
+    const assignment = sprintAssignments.find(
+      a =>
+        (a.projectId === project._id || a.projectId == project._id) &&
+        (a.sprintId === sprint._id || a.sprintId == sprint._id)
     )
-    if (match && Array.isArray(match.developerIds)) {
-      selectedDevelopers.value[sprint.id] = [...match.developerIds]
-    } else {
-      selectedDevelopers.value[sprint.id] = []
-    }
+    selectedDevelopers.value[sprint._id] = assignment?.developerIds || []
   }
 }
 
-const assignSprint = (sprintId) => {
+const assignSprint = async (sprintId) => {
   const developerIds = selectedDevelopers.value[sprintId]
-  if (!Array.isArray(developerIds) || developerIds.length === 0) return
+  if (!developerIds?.length) {
+    alert('Please select at least one developer')
+    return
+  }
 
-  teamStore.assignSprintToDevelopers(
-    currentTeam.value.id,
-    selectedProject.value.id,
-    sprintId,
-    developerIds
-  )
-  alert('Sprint assigned successfully!')
+  try {
+    const res = await fetch(
+      `http://localhost:3000/api/teams/${myTeam.value._id}/assign-sprint`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: selectedProject.value._id,
+          sprintId,
+          developerIds
+        })
+      }
+    )
+
+    if (!res.ok) throw new Error('Sprint assignment failed')
+    alert('Sprint assigned successfully')
+  } catch (e) {
+    alert('Failed to assign sprint: ' + e.message)
+  }
 }
 </script>
 
 <style scoped>
-.sprint-assignment {
-  padding: 20px;
+.container {
+  max-width: 100%;
+  padding: 2rem;
+  font-family: Arial, sans-serif;
   background-color: white;
-  max-width: 800px;
-  margin: auto;
-  border-radius: 10px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-h2,
-h3 {
-  margin-bottom: 10px;
+.heading {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #333;
+  text-align: center;
 }
 
-ul {
-  list-style: none;
-  padding: 0;
-  margin-bottom: 20px;
+.project-selection,
+.sprint-assignment {
+  margin-top: 2rem;
 }
 
-li button {
-  background-color: #4caf50;
+.project-button {
+  margin: 0.25rem;
+  padding: 0.5rem 1rem;
+  background: #007bff;
   color: white;
-  padding: 6px 12px;
   border: none;
-  margin-bottom: 5px;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
 }
 
-li button:hover {
-  background-color: #45a049;
+.project-button:hover {
+  background-color: #0056b3;
 }
 
-table {
+.sprint-card {
+  background: #f1f1f1;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+select {
   width: 100%;
-  border-collapse: collapse;
-  margin-top: 15px;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
 }
 
-th,
-td {
-  padding: 10px;
-  border: 1px solid #ccc;
-  text-align: left;
-}
-
-.multi-select {
-  width: 100%;
-  height: 80px;
-}
-
-.assign-btn {
-  background-color: #2196f3;
-  color: white;
+button {
+  padding: 0.5rem 1rem;
+  background-color: #28a745;
   border: none;
-  padding: 6px 12px;
-  margin-top: 5px;
-  border-radius: 5px;
+  color: white;
+  border-radius: 4px;
   cursor: pointer;
 }
 
-.assign-btn:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
+button:hover {
+  background-color: #1e7e34;
 }
 </style>

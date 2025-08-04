@@ -1,8 +1,6 @@
 <template>
     <Header :role="'developer'" class="heading" />
-
-    <div class="con1">
-        <!-- Personal Information -->
+   <div class="con1">
         <div class="personal-info">
             <h1 class="text">Welcome Developer</h1>
             <div class="text1">
@@ -12,7 +10,6 @@
             </div>
         </div>
 
-        <!-- Task Progress -->
         <div class="Project-status">
             <h2 class="text">Your Task Progress</h2>
             <div style="width: 100%; max-width: 400px; height: 120px; position: relative; margin-top: 30px;">
@@ -20,8 +17,7 @@
                     <div class="progress-bar-container">
                         <div class="progress-bar" :style="{ width: completionPercent + '%' }"></div>
                     </div>
-                    <div class="progress-label">{{ completedTasks }} / {{ totalTasks }} tasks completed ({{
-                        completionPercent }}%)</div>
+                    <div class="progress-label">{{ completedTasks }} / {{ totalTasks }} tasks completed ({{ completionPercent }}%)</div>
                 </div>
                 <div v-else style="margin-top: 30px; color: red; font-weight: bold;">
                     No tasks assigned to you.
@@ -30,7 +26,6 @@
         </div>
     </div>
 
-    <!-- Task List -->
     <div class="con2">
         <div class="task-list">
             <h1>📝 Your Assigned Tasks</h1>
@@ -47,15 +42,13 @@
                     <tr v-for="task in assignedTasks" :key="task.id">
                         <td>{{ task.projectName }}</td>
                         <td>{{ task.sprintName }}</td>
-                        <td>{{ task.name }}</td>
+                        <td>{{ task.title }}</td>
                         <td>
-                            <span :class="task.completed ? 'status-complete' : 'status-pending'">
-                                {{ task.completed ? 'Completed' : 'Pending' }}
+                            <span :class="task.status === 'done' ? 'status-complete' : 'status-pending'">
+                                {{ task.status === 'done' ? 'Completed' : 'Pending' }}
                             </span>
-                            <!-- Complete button removed: task completion is now handled in mySprints.vue -->
                         </td>
                     </tr>
-
                 </tbody>
             </table>
             <div v-else>
@@ -67,91 +60,80 @@
 
 <script setup>
 import Header from './components/header.vue'
-import { computed } from 'vue'
-import { useUserStore } from './store/userStore'
-import { useProjectStore } from './store/projectStore'
-import { useTeamStore } from './store/teamStore'
+import { ref, onMounted, computed } from 'vue'
 
-const userStore = useUserStore()
-const projectStore = useProjectStore()
-const teamStore = useTeamStore()
-
-// ✅ Get logged-in user
-const currentUser = computed(() =>
-    userStore.users.find(u => u.email === userStore.currentEmail)
-)
-
-// ✅ Get team of current developer
-const currentTeam = computed(() =>
-    teamStore.teams.find(team =>
-        Array.isArray(team.developers) &&
-        team.developers.some(dev => dev?.email === currentUser.value?.email)
-    )
-)
-
-// ✅ Get all tasks actually selected/assigned to current developer
-const assignedTasks = computed(() => {
-    if (!currentUser.value || !currentTeam.value) return []
-
-    // Find all sprints assigned to this developer via sprintAssignments
-    const sprintAssignments = Array.isArray(currentTeam.value.sprintAssignments)
-        ? currentTeam.value.sprintAssignments
-        : []
-    const assignedSprints = sprintAssignments
-        .filter(a => Array.isArray(a.developerIds) && a.developerIds.includes(currentUser.value.id))
-        .map(a => {
-            const project = projectStore.projects.find(p => p.id === a.projectId)
-            const sprint = project?.sprints?.find(s => s.id === a.sprintId)
-            return {
-                projectName: project?.name,
-                sprintName: sprint?.name,
-                sprint,
-                project
-            }
-        })
-        .filter(a => a.sprint && a.project)
-
-    // Only include tasks where assignedTo includes the current user's email
-    let tasks = []
-    for (const s of assignedSprints) {
-        for (const task of s.sprint.tasks || []) {
-            if (Array.isArray(task.assignedTo) && task.assignedTo.includes(currentUser.value.email)) {
-                tasks.push({
-                    ...task,
-                    projectName: s.projectName,
-                    sprintName: s.sprintName
-                })
-            } else if (typeof task.assignedTo === 'string' && task.assignedTo === currentUser.value.email) {
-                tasks.push({
-                    ...task,
-                    projectName: s.projectName,
-                    sprintName: s.sprintName
-                })
-            }
-        }
-    }
-    return tasks
-})
-
+const currentUser = ref(null)
+const assignedTasks = ref([])
 const totalTasks = computed(() => assignedTasks.value.length)
-const completedTasks = computed(() =>
-    assignedTasks.value.filter(task => task.completed).length
-)
-const completionPercent = computed(() =>
-    totalTasks.value ? Math.round((completedTasks.value / totalTasks.value) * 100) : 0
-)
-function markTaskComplete(task) {
-  // Find the project and sprint in the store
-  const project = projectStore.projects.find(p => p.name === task.projectName)
-  const sprint = project?.sprints?.find(s => s.name === task.sprintName)
-  const storeTask = sprint?.tasks?.find(t => t.id === task.id)
-  if (storeTask) {
-    storeTask.completed = true
-    if (typeof projectStore.saveToLocalStorage === 'function') {
-      projectStore.saveToLocalStorage()
+const completedTasks = computed(() => assignedTasks.value.filter(t => t.status === 'done').length)
+const completionPercent = computed(() => totalTasks.value ? Math.round((completedTasks.value / totalTasks.value) * 100) : 0)
+
+onMounted(async () => {
+  const email = localStorage.getItem('currentEmail');
+  const userRes = await fetch('http://localhost:3000/api/users');
+  const users = await userRes.json();
+  currentUser.value = users.find(u => u.email === email);
+
+  if (!currentUser.value) {
+    alert('❌ Current user not found.');
+    return;
+  }
+  alert(`✅ Logged in as: ${currentUser.value.name}`);
+
+  const teamsRes = await fetch('http://localhost:3000/api/teams');
+  const teams = await teamsRes.json();
+  const currentTeam = teams.find(team =>
+    team.developers.some(dev => dev.email === currentUser.value.email)
+  );
+
+  if (!currentTeam) {
+    alert('⚠️ No team found for this developer.');
+    return;
+  }
+  alert('✅ Team found.');
+
+  const projectsRes = await fetch('http://localhost:3000/api/projects');
+  const projects = await projectsRes.json();
+  alert(`📦 Total Projects Fetched: ${projects.length}`);
+
+  const assignments = currentTeam.sprintAssignments.filter(assign =>
+    assign.developerIds.includes(currentUser.value._id)
+  );
+
+  alert(`📌 Total Sprint Assignments: ${assignments.length}`);
+
+  for (const assign of assignments) {
+    const project = projects.find(p => p._id === assign.projectId);
+    if (!project) {
+      alert(`❌ Project not found for ID: ${assign.projectId}`);
+      continue;
+    }
+
+    const sprint = project?.sprints.find(s => s._id === assign.sprintId);
+    if (!sprint) {
+      alert(`⚠️ Sprint not found in project "${project.name}"`);
+      continue;
+    }
+
+    alert(`🔍 Found sprint "${sprint.name}" in project "${project.name}"`);
+
+    for (const task of sprint.tasks || []) {
+      if (
+        task.assignedTo === currentUser.value.email ||
+        (Array.isArray(task.assignedTo) && task.assignedTo.includes(currentUser.value.email))
+      ) {
+        assignedTasks.value.push({
+          ...task,
+          projectName: project.name,
+          sprintName: sprint.name
+        });
+      }
     }
   }
-}
+
+  alert(`✅ Total tasks assigned to you: ${assignedTasks.value.length}`);
+});
+
 </script>
 
 <style scoped>

@@ -8,10 +8,9 @@
         <label for="name">Project Name</label>
         <input
           v-model="name"
-          id="name"
           type="text"
+          id="name"
           placeholder="Enter project name"
-          required
         />
       </div>
 
@@ -20,41 +19,25 @@
         <textarea
           v-model="description"
           id="description"
-          placeholder="Describe the project"
-          required
+          placeholder="Enter project description"
         ></textarea>
       </div>
 
       <button type="submit">Create Project</button>
     </form>
 
-    <p v-if="successMessage" class="success">{{ successMessage }}</p>
+    <p class="success-message">{{ successMessage }}</p>
   </div>
 
-  <!-- Display all projects -->
-  <div class="project-list" v-if="projectStore.projects.length > 0">
-    <h2>📋 All Projects</h2>
+  <div class="project-list">
+    <h2>All Projects 📋</h2>
     <ul>
-      <li v-for="project in projectStore.projects" :key="project.id" class="project-item">
+      <li v-for="project in projects" :key="project._id || project.id" class="project-item">
         <h3>{{ project.name }}</h3>
         <p>{{ project.description }}</p>
-        <small>Project ID: {{ project.id }}</small>
-
-        <!-- Show assigned teams -->
-        <div v-if="getTeamsAssignedToProject(project.id).length">
-          <strong>Assigned Teams:</strong>
-          <ul>
-            <li
-              v-for="team in getTeamsAssignedToProject(project.id)"
-              :key="team.id"
-            >
-              Team {{ team.id }} (Lead: {{ team.teamLead?.name || 'N/A' }})
-            </li>
-          </ul>
-        </div>
-        <div v-else>
-          <em>No team assigned</em>
-        </div>
+        <p><strong>Progress:</strong> {{ project.progress }}%</p>
+        <p><strong>Sprints:</strong> {{ project.sprints?.length || 0 }}</p>
+        <small><strong>ID:</strong> {{ project._id }}</small>
       </li>
     </ul>
   </div>
@@ -63,110 +46,106 @@
 <script setup>
 import { ref } from 'vue'
 import Header from './components/header.vue'
-import { useProjectStore } from './store/projectStore'
-import { useTeamStore } from './store/teamStore'
 
 const name = ref('')
 const description = ref('')
 const successMessage = ref('')
-const projectStore = useProjectStore()
-const teamStore = useTeamStore()
+const projects = ref([])
 
-function handleSubmit() {
+// Fetch all projects
+async function fetchData() {
+  try {
+    const res = await fetch('http://localhost:3000/api/projects')
+    if (res.ok) {
+      const data = await res.json()
+      projects.value = Array.isArray(data) ? data : []
+    } else {
+      projects.value = []
+    }
+  } catch (error) {
+    console.error('❌ Error fetching projects:', error)
+    projects.value = []
+  }
+}
+
+fetchData()
+
+// Create new project
+async function handleSubmit() {
   if (!name.value.trim() || !description.value.trim()) {
     successMessage.value = '❌ Please fill in all fields.'
     return
   }
 
-  // Add the project via store
-  projectStore.addProject(name.value, description.value)
+  try {
+    const res = await fetch('http://localhost:3000/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: name.value,
+        description: description.value
+        // assignedTeam, sprints, and progress will default via schema
+      })
+    })
 
-  successMessage.value = '✅ Project created successfully!'
-  name.value = ''
-  description.value = ''
-}
-
-// Helper to get teams assigned to a project
-function getTeamsAssignedToProject(projectId) {
-  return teamStore.teams.filter(team =>
-    team.assignedProjects?.includes(projectId)
-  )
+    if (res.ok) {
+      successMessage.value = '✅ Project created successfully!'
+      name.value = ''
+      description.value = ''
+      await fetchData()
+    } else {
+      const err = await res.json()
+      console.error('❌ Server responded with:', err)
+      successMessage.value = '❌ Failed to create project.'
+    }
+  } catch (err) {
+    console.error('❌ Error creating project:', err)
+    successMessage.value = '❌ Failed to create project.'
+  }
 }
 </script>
 
 <style scoped>
-.project-form {
-  position: absolute;
-  width: 500px;
-  margin: 0 auto;
-  background: #fdf6e3;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
-  margin-left: 10px;
-  margin-top: 50px;
+.project-form,
+.project-list {
+  margin: 2rem;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #f9f9f9;
 }
 
 .form-group {
-  margin-bottom: 16px;
-}
-
-label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: bold;
+  margin-bottom: 1rem;
 }
 
 input,
 textarea {
   width: 100%;
-  padding: 8px;
-  border-radius: 6px;
+  padding: 0.5rem;
+  margin-top: 0.25rem;
+  border-radius: 4px;
   border: 1px solid #ccc;
 }
 
 button {
-  background-color: #0077cc;
+  background-color: #007bff;
   color: white;
-  padding: 10px 16px;
+  padding: 0.5rem 1rem;
   border: none;
-  border-radius: 6px;
-  cursor: pointer;
+  border-radius: 4px;
 }
 
-.success {
-  margin-top: 10px;
-  color: green;
+.success-message {
+  margin-top: 1rem;
   font-weight: bold;
 }
 
-.project-list {
-  position: absolute;
-  width: 700px;
-  margin: 20px auto;
-  background: #e3f2fd;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
-  margin-left: 700px;
-  margin-top: 20px;
-  height:75vh;
-}
-
 .project-item {
-  background: #ffffff;
-  padding: 10px 15px;
-  margin-bottom: 10px;
-  border-left: 5px solid #0077cc;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #ffffff;
   border-radius: 6px;
-}
-
-.project-item h3 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.project-item p {
-  margin: 5px 0;
+  border: 1px solid #ccc;
 }
 </style>

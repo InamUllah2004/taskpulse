@@ -43,52 +43,67 @@
 
 <script setup>
 import Header from './components/header.vue';
-import { useUserStore } from './store/userStore'
-import { onMounted } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import Chart from 'chart.js/auto'
-import { useProjectStore } from './store/projectStore'
 import { useMessageStore } from './store/messageStore'
-import { computed } from 'vue'
 
 const messageStore = useMessageStore()
-
-
 const latestMessage = computed(() => {
   const messages = messageStore.messages
   return messages.length ? messages[messages.length - 1] : null
 })
 
-//for personal-info
-const userStore = useUserStore()
-const currentUser = userStore.users.find(u => u.email === userStore.currentEmail)
-//for project status
-const projectStore = useProjectStore()
+// MongoDB-backed user and project data
+const currentUser = ref(null)
+const projects = ref([])
 
+onMounted(async () => {
+  // Get currentEmail from localStorage
+  const currentEmail = localStorage.getItem('currentEmail')
+  // Fetch users from backend
+  try {
+    const userRes = await fetch('http://localhost:3000/api/users')
+    if (userRes.ok) {
+      const users = await userRes.json()
+      currentUser.value = users.find(u => u.email === currentEmail)
+      
+    }
+  } catch (e) {
+    currentUser.value = null
+  }
+  // Fetch projects from backend
+  try {
+    const projRes = await fetch('http://localhost:3000/api/projects')
+    if (projRes.ok) {
+      projects.value = await projRes.json()
+      
+    }
+  } catch (e) {
+   
+    projects.value = []
+  }
 
+ // Chart.js logic
+  const completedCount = projects.value.filter(p => p.progress === 100).length
+  const halfwayCount = projects.value.filter(p => p.progress > 50 && p.progress < 100).length
+  const uncompletedCount = projects.value.filter(p => p.progress <= 50).length
 
-onMounted(() => {
-  
-const completedCount = projectStore.projects.filter(p => p.progress === 100).length
-  const halfwayCount = projectStore.projects.filter(p => p.progress > 50 && p.progress < 100).length
-  const uncompletedCount = projectStore.projects.filter(p => p.progress <= 50).length
-
-  // Setup Chart.js
   const ctx = document.getElementById('projectProgressChart').getContext('2d')
   new Chart(ctx, {
-    type: 'pie', // 👈 Change this
+    type: 'pie',
     data: {
       labels: ['Completed', 'Halfway', 'Uncompleted'],
       datasets: [{
         label: 'Projects Status',
         data: [completedCount, halfwayCount, uncompletedCount],
-        backgroundColor: ['#4CAF50', '#2196F3', '#FF5722'], // changed halfway to blue
+        backgroundColor: ['#4CAF50', '#2196F3', '#FF5722'],
         borderColor: ['#388E3C', '#1976D2', '#D84315'],
         borderWidth: 1
       }]
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false, // allow full height control
+      maintainAspectRatio: false,
       plugins: {
         legend: {
           position: 'top'
