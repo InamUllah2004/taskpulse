@@ -26,11 +26,10 @@ jobs:
 
       - name: ⚙️ Build frontend (Vite)
         run: |
-          cd frontend
           npm run build
 
       - name: 🚀 Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: frontend/dist  # Adjust path to your Vite build output
+          github_token: ${{ secrets.TASK_PULSE_SECRET_KEY }}
+          publish_dir: ./dist  # Adjust path to your Vite build output
