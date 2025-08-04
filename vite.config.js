@@ -1,8 +1,8 @@
+// vite.config.js
 import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import vue from '@vitejs/plugin-vue' // or react if you're using React
 
-// https://vite.dev/config/
 export default defineConfig({
-  base: '/taskpulse/',
   plugins: [vue()],
+  base: '/taskpulse/', // 👈 IMPORTANT: use your repo name here with trailing slash
 })
