@@ -140,7 +140,7 @@ async function handleAddSprint(projectId) {
   };
 
   try {
-    const response = await fetch(`http://localhost:3000/api/projects/${projectId}/sprints`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/${projectId}/sprints`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sprint: newSprint })
@@ -158,7 +158,7 @@ async function handleAddSprint(projectId) {
 }
 
 async function deleteSprint(projectId, sprintId) {
-  await fetch(`http://localhost:3000/api/projects/${projectId}/sprints/${sprintId}`, {
+  await fetch(`${import.meta.env.VITE_API_URL}/api/projects/${projectId}/sprints/${sprintId}`, {
     method: 'DELETE'
   })
   fetchProjects()
@@ -181,7 +181,7 @@ const addTask = async () => {
   };
 
   try {
-    const res = await fetch(`http://localhost:3000/api/projects/${projectId}/sprints/${sprintId}/tasks`, {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/projects/${projectId}/sprints/${sprintId}/tasks`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ task: newTask })
