@@ -51,20 +51,22 @@ const currentUser = ref(null)
 const assignedSprints = ref([])
 
 onMounted(async () => {
+  const apiUrl = import.meta.env.VITE_API_URL; 
+    console.log('api', apiUrl)
   const email = localStorage.getItem('currentEmail')
-  const userRes = await fetch('http://localhost:3000/api/users')
+  const userRes = await fetch(`${apiUrl}/api/users`)
   const users = await userRes.json()
   currentUser.value = users.find(u => u.email === email)
   if (!currentUser.value) return alert('❌ Current user not found.')
 
-  const teamsRes = await fetch('http://localhost:3000/api/teams')
+  const teamsRes = await fetch(`${apiUrl}/api/teams`)
   const teams = await teamsRes.json()
   const currentTeam = teams.find(team =>
     team.developers.some(dev => dev.email === currentUser.value.email)
   )
   if (!currentTeam) return alert('⚠️ No team found for this user.')
 
-  const projectsRes = await fetch('http://localhost:3000/api/projects')
+  const projectsRes = await fetch(`${apiUrl}/api/projects`)
   const projects = await projectsRes.json()
 
   const assignments = currentTeam.sprintAssignments.filter(assign =>
@@ -81,6 +83,7 @@ onMounted(async () => {
 })
 
 function isTaskAssignedToMe(task) {
+ 
   if (!task.assignedTo) return false
   if (Array.isArray(task.assignedTo)) {
     return task.assignedTo.includes(currentUser.value.email)
@@ -89,7 +92,9 @@ function isTaskAssignedToMe(task) {
 }
 
 async function assignToMe(task, sprintInfo) {
-  const projectRes = await fetch(`http://localhost:3000/api/projects/${sprintInfo.project._id}`);
+  const apiUrl = import.meta.env.VITE_API_URL; 
+    console.log('api', apiUrl)
+  const projectRes = await fetch(`${apiUrl}/api/projects/${sprintInfo.project._id}`);
   const project = await projectRes.json();
 
   const sprint = project.sprints.find(s => s._id === sprintInfo.sprint._id);
@@ -102,7 +107,7 @@ async function assignToMe(task, sprintInfo) {
   storeTask.status = 'in-progress';
 
   // ✅ Capture the response in updateRes
-  const updateRes = await fetch(`http://localhost:3000/api/projects/${project._id}/sprints/${sprint._id}/tasks`, {
+  const updateRes = await fetch(`${apiUrl}/api/projects/${project._id}/sprints/${sprint._id}/tasks`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ task: storeTask })
@@ -117,13 +122,15 @@ async function assignToMe(task, sprintInfo) {
 }
 
 async function markComplete(task, sprintInfo) {
-  const projectRes = await fetch(`http://localhost:3000/api/projects/${sprintInfo.project._id}`)
+  const apiUrl = import.meta.env.VITE_API_URL; 
+    console.log('api', apiUrl)
+  const projectRes = await fetch(`${apiUrl}/api/projects/${sprintInfo.project._id}`)
   const project = await projectRes.json()
   const sprint = project.sprints.find(s => s._id === sprintInfo.sprint._id)
   const storeTask = sprint.tasks.find(t => t._id === task._id)
   storeTask.completed = true
   storeTask.status = 'done'
-  await fetch(`http://localhost:3000/api/projects/${project._id}/sprints/${sprint._id}/tasks`, {
+  await fetch(`${apiUrl}/api/projects/${project._id}/sprints/${sprint._id}/tasks`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ task: storeTask })

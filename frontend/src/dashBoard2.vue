@@ -69,8 +69,10 @@ const completedTasks = computed(() => assignedTasks.value.filter(t => t.status =
 const completionPercent = computed(() => totalTasks.value ? Math.round((completedTasks.value / totalTasks.value) * 100) : 0)
 
 onMounted(async () => {
+    const apiUrl = import.meta.env.VITE_API_URL; 
+    console.log('api', apiUrl)
   const email = localStorage.getItem('currentEmail');
-  const userRes = await fetch('http://localhost:3000/api/users');
+  const userRes = await fetch(`${apiUrl}/api/users`);
   const users = await userRes.json();
   currentUser.value = users.find(u => u.email === email);
 
@@ -80,7 +82,7 @@ onMounted(async () => {
   }
   alert(`✅ Logged in as: ${currentUser.value.name}`);
 
-  const teamsRes = await fetch('http://localhost:3000/api/teams');
+  const teamsRes = await fetch(`${apiUrl}/api/teams`);
   const teams = await teamsRes.json();
   const currentTeam = teams.find(team =>
     team.developers.some(dev => dev.email === currentUser.value.email)
@@ -92,7 +94,7 @@ onMounted(async () => {
   }
   alert('✅ Team found.');
 
-  const projectsRes = await fetch('http://localhost:3000/api/projects');
+  const projectsRes = await fetch(`${apiUrl}/api/projects`);
   const projects = await projectsRes.json();
   alert(`📦 Total Projects Fetched: ${projects.length}`);
 

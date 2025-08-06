@@ -25,8 +25,10 @@ import Header from './components/header.vue';
 const users = ref([])
 
 onMounted(async () => {
+  const apiUrl = import.meta.env.VITE_API_URL; 
+    console.log('api', apiUrl)
   try {
-    const res = await fetch('http://localhost:3000/api/users')
+    const res = await fetch(`${apiUrl}/api/users`)
     if (res.ok) {
       users.value = await res.json()
     }

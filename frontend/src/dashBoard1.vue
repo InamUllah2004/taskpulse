@@ -74,11 +74,13 @@ function formatTime(ts) {
 }
 
 async function fetchAll() {
+  const apiUrl = import.meta.env.VITE_API_URL; 
+    console.log('api', apiUrl)
   try {
     const [userRes, teamRes, projectRes] = await Promise.all([
-      fetch('http://localhost:3000/api/users'),
-      fetch('http://localhost:3000/api/teams'),
-      fetch('http://localhost:3000/api/projects')
+      fetch(`${apiUrl}/api/users`),
+      fetch(`${apiUrl}/api/teams`),
+      fetch(`${apiUrl}/api/projects`)
     ])
 
     users.value = userRes.ok ? await userRes.json() : []

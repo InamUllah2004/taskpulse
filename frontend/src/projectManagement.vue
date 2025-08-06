@@ -54,8 +54,10 @@ const projects = ref([])
 
 // Fetch all projects
 async function fetchData() {
+  const apiUrl = import.meta.env.VITE_API_URL; 
+  console.log('api', apiUrl)
   try {
-    const res = await fetch('http://localhost:3000/api/projects')
+    const res = await fetch(`${apiUrl}/api/projects`)
     if (res.ok) {
       const data = await res.json()
       projects.value = Array.isArray(data) ? data : []

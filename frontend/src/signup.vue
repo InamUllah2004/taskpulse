@@ -62,8 +62,10 @@ const handleClick = async () => {
   } else {
     errorMessage.value = ''
     // Check if email exists in DB
+    const apiUrl = import.meta.env.VITE_API_URL; 
+    console.log('api', apiUrl)
     try {
-      const checkRes = await fetch('http://localhost:3000/api/users');
+      const checkRes = await fetch(`${apiUrl}/api/users`);
       const users = checkRes.ok ? await checkRes.json() : [];
       const emailExists = users.some(user => user.email === email.value);
       if (emailExists) {
@@ -76,7 +78,7 @@ const handleClick = async () => {
     }
     // Insert user in MongoDB
     try {
-      const res = await fetch('http://localhost:3000/api/users/', {
+      const res = await fetch(`${apiUrl}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

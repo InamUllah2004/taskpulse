@@ -57,8 +57,10 @@ function validatePassword() {
 }
 
 async function handleLogin() {
+  const apiUrl = import.meta.env.VITE_API_URL; 
+    console.log('api', apiUrl)
   try {
-    const res = await fetch('http://localhost:3000/api/login', {
+    const res = await fetch(`${apiUrl}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.value, password: password.value }),

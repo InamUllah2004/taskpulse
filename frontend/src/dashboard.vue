@@ -58,11 +58,13 @@ const currentUser = ref(null)
 const projects = ref([])
 
 onMounted(async () => {
+  const apiUrl = import.meta.env.VITE_API_URL; 
+    console.log('api', apiUrl)
   // Get currentEmail from localStorage
   const currentEmail = localStorage.getItem('currentEmail')
   // Fetch users from backend
   try {
-    const userRes = await fetch('http://localhost:3000/api/users')
+    const userRes = await fetch(`${apiUrl}/api/users`)
     if (userRes.ok) {
       const users = await userRes.json()
       currentUser.value = users.find(u => u.email === currentEmail)
@@ -73,7 +75,7 @@ onMounted(async () => {
   }
   // Fetch projects from backend
   try {
-    const projRes = await fetch('http://localhost:3000/api/projects')
+    const projRes = await fetch(`${apiUrl}/api/projects`)
     if (projRes.ok) {
       projects.value = await projRes.json()
       
