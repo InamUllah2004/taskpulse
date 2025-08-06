@@ -140,7 +140,7 @@ async function handleAddSprint(projectId) {
   };
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/${projectId}/sprints`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/projects/${projectId}/sprints`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sprint: newSprint })
