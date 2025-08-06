@@ -92,9 +92,9 @@ const selectedProjectId = ref('')
 async function fetchAll() {
   try {
     const [teamRes, userRes, projectRes] = await Promise.all([
-      fetch('http://localhost:3000/api/teams'),
-      fetch('http://localhost:3000/api/users'),
-      fetch('http://localhost:3000/api/projects')
+      fetch(import.meta.env.VITE_API_URL + '/api/teams'),
+      fetch(import.meta.env.VITE_API_URL + '/api/users'),
+      fetch(import.meta.env.VITE_API_URL + '/api/projects')
     ])
 
     teams.value = teamRes.ok ? await teamRes.json() : []
@@ -158,7 +158,7 @@ async function createTeam() {
 
   try {
     // Create the team first
-    const res = await fetch('http://localhost:3000/api/teams', {
+    const res = await fetch(import.meta.env.VITE_API_URL + '/api/teams', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(teamObj)

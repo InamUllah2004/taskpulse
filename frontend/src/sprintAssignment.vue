@@ -64,9 +64,9 @@ if (!currentEmail.value) {
 onMounted(async () => {
   try {
     const [userRes, teamRes, projectRes] = await Promise.all([
-      fetch('http://localhost:3000/api/users'),
-      fetch('http://localhost:3000/api/teams'),
-      fetch('http://localhost:3000/api/projects')
+      fetch(import.meta.env.VITE_API_URL + '/api/users'),
+      fetch(import.meta.env.VITE_API_URL + '/api/teams'),
+      fetch(import.meta.env.VITE_API_URL + '/api/projects')
     ])
 
     users.value = userRes.ok ? await userRes.json() : []

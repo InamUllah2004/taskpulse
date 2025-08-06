@@ -90,7 +90,7 @@ const sprintData = ref({ name: '', goal: '', startDate: '', endDate: '' })
 const taskData = ref({ title: '', description: '' })
 
 async function fetchProjects() {
-  const res = await fetch('http://localhost:3000/api/projects')
+  const res = await fetch(import.meta.env.VITE_API_URL + '/api/projects')
   const data = await res.json()
   projects.value = data.map(p => ({ ...p, sprints: p.sprints || [] }))
 }
