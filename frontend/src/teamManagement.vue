@@ -165,8 +165,9 @@ async function createTeam() {
     });
 
     if (res.ok) {
+      await new Promise(resolve => setTimeout(resolve, 300)); // wait 300ms
       // Now update lead's availability in DB
-      await fetch(`http://localhost:3000/api/users/${lead._id || lead.id}`, {
+      await fetch(import.meta.env.VITE_API_URL + `/api/users/${lead._id || lead.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ available: 1 })
@@ -174,7 +175,7 @@ async function createTeam() {
 
       // Update each developer’s availability
       for (const dev of developers) {
-        await fetch(`http://localhost:3000/api/users/${dev._id || dev.id}`, {
+        await fetch(import.meta.env.VITE_API_URL + `/api/users/${dev._id || dev.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ available: 1 })
@@ -207,7 +208,7 @@ async function assignProjectToTeam() {
   if (!team.assignedProjects) team.assignedProjects = []
   if (!team.assignedProjects.includes(projectId)) team.assignedProjects.push(projectId)
   try {
-    const res = await fetch(`http://localhost:3000/api/teams/${team._id || team.id}`, {
+    const res = await fetch(import.meta.env.VITE_API_URL + `/api/teams/${team._id || team.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(team)

@@ -127,7 +127,7 @@ const assignSprint = async (sprintId) => {
 
   try {
     const res = await fetch(
-      `http://localhost:3000/api/teams/${myTeam.value._id}/assign-sprint`,
+      import.meta.env.VITE_API_URL + `/api/teams/${myTeam.value._id}/assign-sprint`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
