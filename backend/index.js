@@ -7,15 +7,35 @@ import bcrypt from 'bcrypt';
 import Sprint from './models/sprint.js';
 import Project from './models/project.js';
 import Team from './models/team.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const app = express();
-app.use(cors({ origin: 'http://localhost:5173' }));
+
+
+// Middleware
+
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://dreamy-starburst-5c6c0e.netlify.app'
+  ],
+  credentials: true
+}));
+
+
 app.use(express.json());
 
-// MongoDB connection
-mongoose.connect('mongodb://localhost:27017/project_management')
-  .then(() => console.log('MongoDB connected!'))
-  .catch(err => console.error('MongoDB connection error:', err));
+// ✅ Direct MongoDB URI (for practice only)
+mongoose.connect(
+  process.env.MONGODB_URI,
+  {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  }
+)
+.then(() => console.log('MongoDB connected'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 // Logger middleware
 app.use((req, res, next) => {
@@ -181,6 +201,35 @@ app.put('/api/teams/:id/assign-sprint', async (req, res) => {
   } catch (err) {
     console.error('❌ Error assigning sprint:', err);
     res.status(500).json({ message: 'Failed to assign sprint' });
+  }
+});
+// Create a new team
+app.post('/api/teams', async (req, res) => {
+  try {
+    const { teamLead, developers, assignedProjects = [], sprintAssignments = [] } = req.body;
+
+    const newTeam = new Team({
+      teamLead,
+      developers,
+      assignedProjects,
+      sprintAssignments
+    });
+
+    const savedTeam = await newTeam.save();
+
+    // Optionally populate related fields
+    const populatedTeam = await Team.findById(savedTeam._id)
+      .populate('teamLead')
+      .populate('developers')
+      .populate('assignedProjects')
+      .populate('sprintAssignments.projectId')
+      .populate('sprintAssignments.sprintId')
+      .populate('sprintAssignments.developerIds');
+
+    res.status(201).json(populatedTeam);
+  } catch (err) {
+    console.error('❌ Error creating team:', err);
+    res.status(500).json({ error: 'Failed to create team' });
   }
 });
 

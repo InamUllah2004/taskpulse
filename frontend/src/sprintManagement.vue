@@ -17,7 +17,6 @@
 
         <div v-if="openProjectId === (project._id || project.id)" class="sprint-section">
           <h4 class="sprint-title">Sprints for: {{ project.name }}</h4>
-
           <ul v-if="project.sprints?.length" class="sprint-list">
             <li v-for="sprint in project.sprints" :key="sprint.id" class="sprint-card">
               <div>
@@ -26,7 +25,8 @@
               </div>
               <div class="task-buttons">
                 <button class="add-btn" @click="openTaskModal(project._id || project.id, sprint.id)">Add Task</button>
-                <button class="view-btn" @click="openViewModal(sprint.id, project._id || project.id)">View Tasks</button>
+                <button class="view-btn" @click="openViewModal(sprint.id, project._id || project.id)">View
+                  Tasks</button>
                 <button class="delete-btn" @click="deleteSprint(project._id || project.id, sprint.id)">Delete</button>
               </div>
             </li>
@@ -316,9 +316,11 @@ const addTask = async () => {
   background-color: #dc3545;
   color: white;
 }
+
 .task-buttons {
   display: flex;
-  gap: 10px; /* spacing between buttons */
+  gap: 10px;
+  /* spacing between buttons */
   justify-content: flex-end;
   margin-top: 10px;
 }
@@ -360,9 +362,9 @@ const addTask = async () => {
   width: 400px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
+
 .task-buttons .view-btn {
   background-color: #17a2b8;
   color: white;
 }
-
 </style>

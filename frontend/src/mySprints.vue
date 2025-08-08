@@ -45,26 +45,34 @@
 
 <script setup>
 import Header from './components/header.vue'
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 
 const currentUser = ref(null)
 const assignedSprints = ref([])
+const apiUrl = import.meta.env.VITE_API_URL
 
 onMounted(async () => {
-  const apiUrl = import.meta.env.VITE_API_URL; 
-    console.log('api', apiUrl)
   const email = localStorage.getItem('currentEmail')
+
   const userRes = await fetch(`${apiUrl}/api/users`)
   const users = await userRes.json()
   currentUser.value = users.find(u => u.email === email)
-  if (!currentUser.value) return alert('❌ Current user not found.')
+
+  if (!currentUser.value) {
+    alert('❌ Current user not found.')
+    return
+  }
 
   const teamsRes = await fetch(`${apiUrl}/api/teams`)
   const teams = await teamsRes.json()
   const currentTeam = teams.find(team =>
     team.developers.some(dev => dev.email === currentUser.value.email)
   )
-  if (!currentTeam) return alert('⚠️ No team found for this user.')
+
+  if (!currentTeam) {
+    alert('⚠️ No team found for this user.')
+    return
+  }
 
   const projectsRes = await fetch(`${apiUrl}/api/projects`)
   const projects = await projectsRes.json()
@@ -83,53 +91,59 @@ onMounted(async () => {
 })
 
 function isTaskAssignedToMe(task) {
- 
-  if (!task.assignedTo) return false
-  if (Array.isArray(task.assignedTo)) {
-    return task.assignedTo.includes(currentUser.value.email)
+  if (!task.assignedTo || !currentUser.value) return false
+
+  const assignedTo = task.assignedTo
+  const currentEmail = currentUser.value.email
+  const currentId = currentUser.value._id
+
+  if (Array.isArray(assignedTo)) {
+    return assignedTo.includes(currentEmail) || assignedTo.includes(currentId)
   }
-  return task.assignedTo === currentUser.value.email
+
+  return assignedTo === currentEmail || assignedTo === currentId
 }
 
 async function assignToMe(task, sprintInfo) {
-  const apiUrl = import.meta.env.VITE_API_URL; 
-    console.log('api', apiUrl)
-  const projectRes = await fetch(`${apiUrl}/api/projects/${sprintInfo.project._id}`);
-  const project = await projectRes.json();
+  const projectRes = await fetch(`${apiUrl}/api/projects/${sprintInfo.project._id}`)
+  const project = await projectRes.json()
 
-  const sprint = project.sprints.find(s => s._id === sprintInfo.sprint._id);
-  if (!sprint) return alert('Sprint not found');
+  const sprint = project.sprints.find(s => s._id === sprintInfo.sprint._id)
+  if (!sprint) return alert('Sprint not found')
 
-  const storeTask = sprint.tasks.find(t => t._id === task._id);
-  if (!storeTask) return alert('Task not found');
+  const storeTask = sprint.tasks.find(t => t._id === task._id)
+  if (!storeTask) return alert('Task not found')
 
-  storeTask.assignedTo = currentUser.value._id; // or use .email only if you store email
-  storeTask.status = 'in-progress';
+  storeTask.assignedTo = currentUser.value._id
+  storeTask.status = 'in-progress'
 
-  // ✅ Capture the response in updateRes
-  const updateRes = await fetch(`${apiUrl}/api/projects/${project._id}/sprints/${sprint._id}/tasks`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task: storeTask })
-  });
+  const updateRes = await fetch(
+    `${apiUrl}/api/projects/${project._id}/sprints/${sprint._id}/tasks`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: storeTask })
+    }
+  )
 
   if (!updateRes.ok) {
-    const err = await updateRes.json();
-    alert(`❌ Failed to assign task: ${err.message}`);
+    const err = await updateRes.json()
+    alert(`❌ Failed to assign task: ${err.message}`)
   } else {
-    alert('✅ Task assigned successfully!');
+    alert('✅ Task assigned successfully!')
   }
 }
 
 async function markComplete(task, sprintInfo) {
-  const apiUrl = import.meta.env.VITE_API_URL; 
-    console.log('api', apiUrl)
   const projectRes = await fetch(`${apiUrl}/api/projects/${sprintInfo.project._id}`)
   const project = await projectRes.json()
+
   const sprint = project.sprints.find(s => s._id === sprintInfo.sprint._id)
   const storeTask = sprint.tasks.find(t => t._id === task._id)
+
   storeTask.completed = true
   storeTask.status = 'done'
+
   await fetch(`${apiUrl}/api/projects/${project._id}/sprints/${sprint._id}/tasks`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

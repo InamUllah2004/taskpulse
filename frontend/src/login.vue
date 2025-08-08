@@ -1,27 +1,12 @@
 <template>
   <div class="login">
     <form class="login" @submit.prevent="handleLogin">
-      <input
-        v-model="email"
-        type="email"
-        placeholder="Email"
-        @input="validateEmail"
-        required
-      />
-      
-      <input
-        v-model="password"
-        type="password"
-        placeholder="Password"
-        :disabled="!emailValid"
-        @input="validatePassword"
-        required
-      />
-      
-      <button
-        type="submit"
-        @click="handleClick"
-        class="subBtn1">
+      <input v-model="email" type="email" placeholder="Email" @input="validateEmail" required />
+
+      <input v-model="password" type="password" placeholder="Password" :disabled="!emailValid" @input="validatePassword"
+        required />
+
+      <button type="submit" @click="handleClick" class="subBtn1">
         Login
       </button>
 
@@ -37,6 +22,10 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from './store/userStore'
+import { roleMachine } from '../machine/dashboard';
+import { useMachine } from '@xstate/vue'
+
+const { snapshot: state, send } = useMachine(roleMachine)
 
 const email = ref('')
 const password = ref('')
@@ -57,8 +46,11 @@ function validatePassword() {
 }
 
 async function handleLogin() {
-  const apiUrl = import.meta.env.VITE_API_URL; 
-    console.log('api', apiUrl)
+
+  alert(`Current state: ${state.value.value}`);
+
+  const apiUrl = import.meta.env.VITE_API_URL;
+  console.log('api', apiUrl)
   try {
     const res = await fetch(`${apiUrl}/api/login`, {
       method: 'POST',
@@ -88,10 +80,26 @@ async function handleLogin() {
     errorMessage.value = '';
 
     // Redirect based on role
-    if (user.role === 'projectDirector') router.push("/dash");
-    else if (user.role === 'teamLead') router.push("/dashBoard1");
-    else if (user.role === 'developer') router.push("/dashBoard2");
-
+    if (user.role === 'projectDirector') {
+      send({ type: 'projectDirector' })
+    } else if (user.role === 'teamLead') {
+      send({ type: 'teamLead' })
+    } else if (user.role === 'developer') {
+      send({ type: 'developer' })
+    } else {
+      send({ type: 'unauthorised' })
+    }
+    alert(`Current state after login: ${state.value.value}`);
+    //
+    if (state.value.value === 'projectDirector') {
+      router.push('/dash')
+    } else if (state.value.value === 'teamLead') {
+      router.push('/dashBoard1')
+    } else if (state.value.value === 'developer') {
+      router.push('/dashBoard2')
+    } else if (state.value.value === 'unauthorised') {
+      router.push('/unauthorized')
+    }
   } catch (e) {
     errorMessage.value = 'Login failed: ' + e.message;
   }
@@ -105,11 +113,14 @@ async function handleLogin() {
   max-width: 400px;
   margin: 50px auto;
   padding: 2rem;
-  background-color: #fff8e1; /* Light yellow background */
+  background-color: #fff8e1;
+  /* Light yellow background */
   border-radius: 12px;
-  box-shadow: 0 4px 18px rgba(255, 165, 0, 0.3); /* Soft orange shadow */
+  box-shadow: 0 4px 18px rgba(255, 165, 0, 0.3);
+  /* Soft orange shadow */
   margin-top: 50px;
-  border: 2px solid #ffb300; /* Orange border */
+  border: 2px solid #ffb300;
+  /* Orange border */
 }
 
 input {
@@ -117,16 +128,18 @@ input {
   width: 100%;
   margin-bottom: 15px;
   padding: 10px;
-  border: 1px solid #ffcc80; /* Light orange border */
+  border: 1px solid #ffcc80;
+  /* Light orange border */
   border-radius: 6px;
-  background-color: #fff3e0; /* Very light orange bg */
+  background-color: #fff3e0;
+  /* Very light orange bg */
   color: #333;
 }
 
 button {
   width: 100%;
   padding: 10px;
-  background-color: #ffa000; 
+  background-color: #ffa000;
   color: white;
   border: none;
   border-radius: 6px;
@@ -135,7 +148,8 @@ button {
 }
 
 button:hover {
-  background-color: #fb8c00; /* Slightly darker orange */
+  background-color: #fb8c00;
+  /* Slightly darker orange */
 }
 
 button:disabled {
@@ -154,8 +168,9 @@ button:disabled {
   margin-top: 50px;
   margin-left: -50px;
 }
+
 .subBtn1 {
-  background-color: #f6c90e; 
+  background-color: #f6c90e;
   color: white;
 }
 </style>
